@@ -1,113 +1,134 @@
-use iced_wgpu::Renderer;
-use iced_widget::{slider, text_input, Column, Row, Text};
-use iced_winit::core::{Alignment, Color, Element, Length};
-use iced_winit::runtime::{Command, Program};
-use iced_winit::style::Theme;
+// use iced_wgpu::core::Widget;
+// use iced_wgpu::Renderer;
+// use iced_widget::{slider, text_input, Column, Row, Text};
+// use iced_winit::core::{Alignment, Color, Element, Length};
+// use iced_winit::runtime::{Command, Program};
+// use iced_winit::style::Theme;
 
-pub struct Controls {
-    background_color: Color,
-    text: String,
+// pub trait StyleSheet {
+//     type Style: Default;
+// }
+
+// enum Selection {
+//     Vertical {
+//         start: usize,
+//         end: usize,
+//     },
+//     Horizontal {
+//         start: f32,
+//         end: f32,
+//     },
+//     Zone {
+//         v_s: usize,
+//         v_e: usize,
+//         h_s: f32,
+//         h_e: f32,
+//     },
+// }
+
+// // pub struct Chart<Renderer>
+// // where
+// //     Renderer: iced_wgpu::core::Renderer,
+// //     Renderer::Theme: StyleSheet,
+// // {
+// //     smooth_filling: bool,
+// //     grid: bool,
+// //     scrolling: bool,
+// //     scaling: bool,
+// //     minimap: bool,
+// //     magnifier: bool,
+// //     selections: Vec<Selection>,
+// //     data: Vec<f32>,
+// //     // размер x, y
+// //     style: <Renderer::Theme as StyleSheet>::Style,
+// // }
+
+// // impl<Message, Renderer> Widget<Message, Renderer> for Chart<Renderer>
+// // where
+// //     Renderer: iced_wgpu::core::Renderer,
+// // {
+// //     fn width(&self) -> Length {
+// //         todo!()
+// //     }
+
+// //     fn height(&self) -> Length {
+// //         todo!()
+// //     }
+
+// //     fn layout(
+// //         &self,
+// //         renderer: &Renderer,
+// //         limits: &iced_wgpu::core::layout::Limits,
+// //     ) -> iced_wgpu::core::layout::Node {
+// //         todo!()
+// //     }
+
+// //     fn draw(
+// //         &self,
+// //         state: &iced_wgpu::core::widget::Tree,
+// //         renderer: &mut Renderer,
+// //         theme: &Renderer::Theme,
+// //         style: &iced_wgpu::core::renderer::Style,
+// //         layout: iced_wgpu::core::Layout<'_>,
+// //         cursor_position: iced_wgpu::core::Point,
+// //         viewport: &iced_wgpu::core::Rectangle,
+// //     ) {
+// //         renderer.fill_quad(quad, background)
+// //     }
+// // }
+
+use std::collections::HashMap;
+
+use iced_wgpu::core::{window, Element, Widget};
+
+use iced_wgpu::{wgpu, Backend, Renderer, Settings};
+use iced_winit::core::Size;
+use iced_winit::runtime::program;
+use iced_winit::runtime::Debug;
+use iced_winit::{conversion, futures, winit, Clipboard};
+use std::sync::Mutex;
+use crate::utils::SharedMemoryAllocator;
+
+use crate::utils;
+
+struct Screen;
+
+pub type Window<M, R> = Mutex<Box<dyn Widget<M, R>, SharedMemoryAllocator>>;
+
+pub struct App<M, R> {
+    // TODO: ...
+    screens: Vec<Screen>,
+    windows: HashMap<libc::pid_t, Window<M, R>>,
 }
 
-#[derive(Debug, Clone)]
-pub enum Message {
-    BackgroundColorChanged(Color),
-    TextChanged(String),
+enum Action {
+    // TODO: ...
+    Eyes,
 }
 
-impl Controls {
-    pub fn new() -> Controls {
-        Controls {
-            background_color: Color::BLACK,
-            text: Default::default(),
+impl<M, R> App<M, R> 
+where R: iced_wgpu::core::Renderer 
+{
+    pub fn new() -> Self {
+        Self { screens: Default::default(), windows: Default::default() }
+    }
+
+    pub fn add_window<'a>(&mut self, widget: impl Widget<M, R> + 'a) {
+        let alloc: Box<dyn Widget<M, R>, SharedMemoryAllocator> = Box::new_in(widget, SharedMemoryAllocator);
+        let mw = Mutex::new(alloc);
+        let tag = utils::fork().expect("Can't create process fork");
+        
+        match tag {
+            utils::ProcessTag::ParentProcess(pid) => {
+                self.windows.insert(pid, mw);
+            }
+            utils::ProcessTag::ChildProcess => {
+                crate::child_main::child_main(mw);
+            }
         }
     }
 
-    pub fn background_color(&self) -> Color {
-        self.background_color
-    }
-}
-
-impl Program for Controls {
-    type Renderer = Renderer<Theme>;
-    type Message = Message;
-
-    fn update(&mut self, message: Message) -> Command<Message> {
-        match message {
-            Message::BackgroundColorChanged(color) => {
-                self.background_color = color;
-            }
-            Message::TextChanged(text) => {
-                self.text = text;
-            }
-        }
-
-        Command::none()
-    }
-
-    fn view(&self) -> Element<Message, Renderer<Theme>> {
-        let background_color = self.background_color;
-        let text = &self.text;
-
-        let sliders = Row::new()
-            .width(500)
-            .spacing(20)
-            .push(
-                slider(0.0..=1.0, background_color.r, move |r| {
-                    Message::BackgroundColorChanged(Color {
-                        r,
-                        ..background_color
-                    })
-                })
-                .step(0.01),
-            )
-            .push(
-                slider(0.0..=1.0, background_color.g, move |g| {
-                    Message::BackgroundColorChanged(Color {
-                        g,
-                        ..background_color
-                    })
-                })
-                .step(0.01),
-            )
-            .push(
-                slider(0.0..=1.0, background_color.b, move |b| {
-                    Message::BackgroundColorChanged(Color {
-                        b,
-                        ..background_color
-                    })
-                })
-                .step(0.01),
-            );
-
-        Row::new()
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .align_items(Alignment::End)
-            .push(
-                Column::new()
-                    .width(Length::Fill)
-                    .align_items(Alignment::End)
-                    .push(
-                        Column::new()
-                            .padding(10)
-                            .spacing(10)
-                            .push(
-                                Text::new("Background color")
-                                    .style(Color::WHITE),
-                            )
-                            .push(sliders)
-                            .push(
-                                Text::new(format!("{background_color:?}"))
-                                    .size(14)
-                                    .style(Color::WHITE),
-                            )
-                            .push(
-                                text_input("Placeholder", text)
-                                    .on_input(Message::TextChanged),
-                            ),
-                    ),
-            )
-            .into()
+    pub fn draw(&mut self, action: Option<impl IntoIterator<Item = Action>>) {
+        
     }
 }
