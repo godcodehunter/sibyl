@@ -17,6 +17,10 @@ pub fn main() {
     let alloc: Box<dyn Widget<_, _>, SharedMemoryAllocator> = Box::new_in(widget, SharedMemoryAllocator);
     let mw = Arc::new(Mutex::new(alloc));
     app.add_window(mw);
+    let widget = rainbow(); 
+    let alloc: Box<dyn Widget<_, _>, SharedMemoryAllocator> = Box::new_in(widget, SharedMemoryAllocator);
+    let mw = Arc::new(Mutex::new(alloc));
+    app.add_window(mw);
     loop {
         app.draw(None::<Vec<_>>)
     }

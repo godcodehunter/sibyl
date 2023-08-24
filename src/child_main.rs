@@ -2,6 +2,7 @@ use std::sync::Mutex;
 
 use iced_wgpu::core::{Element, Widget};
 use iced_winit::settings::Window;
+use iced_winit::winit::event_loop::ControlFlow;
 use winit::event_loop::EventLoop;
 
 use iced_wgpu::graphics::Viewport;
@@ -112,6 +113,16 @@ pub fn child_main<M, R>(widget: SharedWidget<M, R>) {
 
     // Run event loop
     event_loop.run(move |event, _, control_flow| {
-        
+        match event {
+            winit::event::Event::WindowEvent { window_id, event } => {
+                match event {
+                    winit::event::WindowEvent::CloseRequested => {
+                        *control_flow = ControlFlow::Exit;
+                    },
+                   _ => {},
+                }
+            },
+            _ => {},
+        }
     });
 }
