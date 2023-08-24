@@ -1,6 +1,7 @@
 use std::sync::Mutex;
 
 use iced_wgpu::core::{Element, Widget};
+use iced_winit::settings::Window;
 use winit::event_loop::EventLoop;
 
 use iced_wgpu::graphics::Viewport;
@@ -9,15 +10,16 @@ use iced_widget::runtime::{self, program, Command, Debug};
 use iced_winit::core::Size;
 use iced_winit::{futures, winit};
 
+use crate::controls::SharedWidget;
 use crate::utils::SharedMemoryAllocator;
 
 pub struct Program<M, R> {
-    widget: Mutex<Box<dyn Widget<M, R>, SharedMemoryAllocator>>,
+    widget: SharedWidget<M, R>,
 }
 
 impl<M, R> Program<M, R> {
-    pub fn new() -> Self {
-        todo!()
+    pub fn new(widget: SharedWidget<M, R>) -> Self {
+        Self { widget }
     }
 }
 
@@ -36,7 +38,7 @@ impl<M, R> runtime::Program for Program<M, R> {
 
 // TODO: с одной стороны фреймверк елм подобный с другой, так как это другой поток я поставил
 // для надежности мьютекс, не помешает разобраться потом 
-pub fn child_main<M, R>(widget: Mutex<Box<dyn Widget<M, R>, SharedMemoryAllocator>>) {
+pub fn child_main<M, R>(widget: SharedWidget<M, R>) {
     env_logger::init();
     let event_loop = EventLoop::new();
     let window = winit::window::Window::new(&event_loop).expect("Can't create winit window");
@@ -98,16 +100,18 @@ pub fn child_main<M, R>(widget: Mutex<Box<dyn Widget<M, R>, SharedMemoryAllocato
 
     // Initialize iced
     let mut debug = Debug::new();
-    let mut renderer = Renderer::new(Backend::new(&device, &queue, Settings::default(), format));
+    let mut renderer: iced_graphics::Renderer<iced_wgpu::Backend, iced::Theme> = Renderer::new(Backend::new(&device, &queue, Settings::default(), format));
 
     let mut viewport = Viewport::with_physical_size(
         Size::new(physical_size.width, physical_size.height),
         window.scale_factor(),
     );
 
-    let scene: Program<M, R> = Program::new();
-    let mut state = program::State::new(scene, viewport.logical_size(), &mut renderer, &mut debug);
+    let scene: Program<M, R> = Program::new(widget);
+    // let mut state = program::State::new(scene, viewport.logical_size(), &mut renderer, &mut debug);
 
     // Run event loop
-    event_loop.run(move |event, _, control_flow| {});
+    event_loop.run(move |event, _, control_flow| {
+        
+    });
 }

@@ -86,22 +86,22 @@ use iced_winit::core::Size;
 use iced_winit::runtime::program;
 use iced_winit::runtime::Debug;
 use iced_winit::{conversion, futures, winit, Clipboard};
-use std::sync::Mutex;
+use std::sync::{Mutex, Arc};
 use crate::utils::SharedMemoryAllocator;
 
 use crate::utils;
 
 struct Screen;
 
-pub type Window<M, R> = Mutex<Box<dyn Widget<M, R>, SharedMemoryAllocator>>;
+pub type SharedWidget<M, R> = Arc<Mutex<Box<dyn Widget<M, R>, SharedMemoryAllocator>>>;
 
 pub struct App<M, R> {
     // TODO: ...
     screens: Vec<Screen>,
-    windows: HashMap<libc::pid_t, Window<M, R>>,
+    windows: HashMap<libc::pid_t, SharedWidget<M, R>>,
 }
 
-enum Action {
+pub enum Action {
     // TODO: ...
     Eyes,
 }
@@ -113,17 +113,15 @@ where R: iced_wgpu::core::Renderer
         Self { screens: Default::default(), windows: Default::default() }
     }
 
-    pub fn add_window<'a>(&mut self, widget: impl Widget<M, R> + 'a) {
-        let alloc: Box<dyn Widget<M, R>, SharedMemoryAllocator> = Box::new_in(widget, SharedMemoryAllocator);
-        let mw = Mutex::new(alloc);
+    pub fn add_window<'a>(&mut self, widget: SharedWidget<M, R>) {
         let tag = utils::fork().expect("Can't create process fork");
         
         match tag {
             utils::ProcessTag::ParentProcess(pid) => {
-                self.windows.insert(pid, mw);
+                self.windows.insert(pid, widget);
             }
             utils::ProcessTag::ChildProcess => {
-                crate::child_main::child_main(mw);
+                crate::child_main::child_main(widget);
             }
         }
     }
